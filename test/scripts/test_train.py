@@ -30,7 +30,7 @@ class DummyTrainFolder(DummyAudioFolder):
                               1.0, self.rand(0, 2 * pr.buffer_t))
         self.generate_samples(self.subdir('test', 'not-wake-word'),
                               'nww-{}.wav', 0.0, self.rand(0, 2 * pr.buffer_t))
-        self.model = self.path('model.net')
+        self.model = self.path('model.h5')
 
 
 class TestTrain:

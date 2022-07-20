@@ -15,6 +15,8 @@
 
 from os.path import isfile
 
+import h5py
+
 from precise.scripts.calc_threshold import CalcThresholdScript
 from precise.scripts.eval import EvalScript
 from precise.scripts.graph import GraphScript
@@ -30,7 +32,9 @@ def test_combined(train_folder, train_script):
     """
     train_script.run()
     params_file = train_folder.model + '.params'
-    assert isfile(train_folder.model)
+    h5_file = h5py.File(train_folder.model, 'r')
+    assert h5_file
+    h5_file.close()
     assert isfile(params_file)
 
     EvalScript.create(folder=train_folder.root,

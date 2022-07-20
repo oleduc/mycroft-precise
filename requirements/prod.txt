@@ -1,8 +1,7 @@
-numpy==1.16
-tensorflow>=1.13,<2.8  # Must be on piwheels
+tensorflow==2.3.1  # Must be on piwheels
+numpy
 sonopy
 pyaudio
-keras<=2.1.5
 h5py
 wavio
 typing

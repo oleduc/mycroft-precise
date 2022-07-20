@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  test:
+    platform: linux/amd64
+    image: precise-test:latest
+    build:
+      context: .
+      dockerfile: ./test/Dockerfile
+      target: test-runner
+    working_dir: /opt/mycroft/mycroft-precise
+  Lint_n_Format:
+    platform: linux/amd64
+    image: precise-pylama:latest
+    build:
+      context: .
+      dockerfile: ./test/Dockerfile
+      target: precise-pylama

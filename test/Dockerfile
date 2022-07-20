@@ -4,7 +4,7 @@
 FROM python:3.7-slim as precise-build
 ENV TERM linux
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update && apt-get -y install git python3-scipy cython libhdf5-dev python3-h5py portaudio19-dev swig libpulse-dev libatlas-base-dev
+RUN apt-get update && apt-get -y install git python3-scipy cython3 libhdf5-dev python3-h5py portaudio19-dev swig libpulse-dev libatlas-base-dev
 RUN mkdir -p /root/allure /opt/mycroft/mycroft-precise /root/code-quality
 WORKDIR /opt/mycroft
 COPY requirements/test.txt mycroft-precise/requirements/
@@ -12,7 +12,17 @@ RUN pip install -r mycroft-precise/requirements/test.txt
 COPY requirements/prod.txt mycroft-precise/requirements/
 RUN pip install -r mycroft-precise/requirements/prod.txt
 COPY . mycroft-precise
+# Run the tests defined in the precise repository
+FROM precise-build as test-runner
+WORKDIR /opt/mycroft/mycroft-precise
+ENTRYPOINT ["pytest"]
 
+FROM precise-build as precise-codequality
+RUN python -m pip install pylint2codeclimate pylint
+ENTRYPOINT ["pylint"]
+
+# Do it at the end to prevent all these to be executed when we cannot access devops repository
+#
 # Clone the devops repository, which contiains helper scripts for some continuous
 # integraion tasks. Run the code_check.py script which performs linting (using PyLint)
 # and code formatting (using Black)
@@ -24,8 +34,3 @@ RUN git clone https://$github_api_key@github.com/MycroftAI/devops.git
 WORKDIR /opt/mycroft/devops/jenkins
 RUN pipenv install
 ENTRYPOINT ["pipenv", "run", "python","-m", "pipeline.code_check", "--repository", "mycroft-precise", "--pull-request", "PR-149"]
-
-# Run the tests defined in the precise repository
-FROM precise-build as test-runner
-WORKDIR /opt/mycroft/mycroft-precise
-ENTRYPOINT ["pytest"]

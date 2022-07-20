@@ -15,6 +15,9 @@ __pycache__/
 *.pb
 *.params
 *.net
+*.h5
+*.hdf5
+*.he5
 *.json
 *.pbtxt
 *.wav
@@ -31,3 +34,6 @@ __pycache__/
 /all/
 /mycroft-precise/
 /models/
+
+# Eggs stuffs
+.eggs
