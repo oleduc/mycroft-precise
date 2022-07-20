@@ -44,6 +44,7 @@ build-wheel:
     when: always
     paths:
       - dist/*.whl
+      - dist/*.tar.gz
   rules:
     - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       allow_failure: true
