@@ -28,7 +28,7 @@ if liant_context != '' and liant_context != None:
     version = __liant_version__
 
 local_label = environ.get('PYPI_LOCAL_LABEL')
-if local_label != '' and local_label != None:
+if local_label != '' and local_label != None and local_label != 'main':
     print(f"Try to build with local_label: {local_label}")
     try:
         from precise import __local_version__
