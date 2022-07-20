@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Conversion of audio data to predictions using Pocketsphinx
+Used for comparison with Precise
+"""
+import numpy as np
 from typing import *
 from typing import BinaryIO
-
-import numpy as np
 
 from precise.params import pr
 from precise.util import audio_to_buffer

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,82 +12,103 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Test a dataset using Pocketsphinx
+
+:key_phrase str
+    Key phrase composed of words from dictionary
+
+:dict_file str
+    Filename of dictionary with word pronunciations
+
+:hmm_folder str
+    Folder containing hidden markov model
+
+:-th --threshold str 1e-90
+    Threshold for activations
+
+:-t --use-train
+    Evaluate training data instead of test data
+
+:-nf --no-filenames
+    Don't show the names of files that failed
+
+...
+"""
 import wave
+from prettyparse import Usage
 from subprocess import check_output, PIPE
 
-from prettyparse import create_parser
-
 from precise.pocketsphinx.listener import PocketsphinxListener
-from precise.scripts.test import show_stats, Stats
+from precise.scripts.base_script import BaseScript
+from precise.scripts.test import Stats
 from precise.train_data import TrainData
 
-usage = '''
-    Test a dataset using Pocketsphinx
-    
-    :key_phrase str
-        Key phrase composed of words from dictionary
-    
-    :dict_file str
-        Filename of dictionary with word pronunciations
-    
-    :hmm_folder str
-        Folder containing hidden markov model
-    
-    :-th --threshold str 1e-90
-        Threshold for activations
-    
-    :-t --use-train
-        Evaluate training data instead of test data
-    
-    :-nf --no-filenames
-        Don't show the names of files that failed
-    
-    ...
-'''
 
+class PocketsphinxTestScript(BaseScript):
+    usage = Usage(__doc__) | TrainData.usage
 
-def eval_file(filename) -> float:
-    transcription = check_output(
-        ['pocketsphinx_continuous', '-kws_threshold', '1e-20', '-keyphrase', 'hey my craft',
-         '-infile', filename], stderr=PIPE)
-    return float(bool(transcription) and not transcription.isspace())
+    def __init__(self, args):
+        super().__init__(args)
+        self.listener = PocketsphinxListener(
+            args.key_phrase, args.dict_file, args.hmm_folder, args.threshold
+        )
 
+        self.outputs = []
+        self.targets = []
+        self.filenames = []
 
-def test_pocketsphinx(listener: PocketsphinxListener, data_files) -> Stats:
-    def run_test(filenames, name):
+    def get_stats(self):
+        return Stats(self.outputs, self.targets, self.filenames)
+
+    def run(self):
+        args = self.args
+        data = TrainData.from_both(args.tags_file, args.tags_folder, args.folder)
+        print('Data:', data)
+
+        ww_files, nww_files = data.train_files if args.use_train else data.test_files
+        self.run_test(ww_files, 'Wake Word', 1.0)
+        self.run_test(nww_files, 'Not Wake Word', 0.0)
+        stats = self.get_stats()
+        if not self.args.no_filenames:
+            fp_files = stats.calc_filenames(False, True, 0.5)
+            fn_files = stats.calc_filenames(False, False, 0.5)
+            print('=== False Positives ===')
+            print('\n'.join(fp_files))
+            print()
+            print('=== False Negatives ===')
+            print('\n'.join(fn_files))
+            print()
+        print(stats.counts_str(0.5))
         print()
-        print('===', name, '===')
-        negatives, positives = [], []
-        for filename in filenames:
+        print(stats.summary_str(0.5))
+
+    def eval_file(self, filename) -> float:
+        transcription = check_output(
+            ['pocketsphinx_continuous', '-kws_threshold', '1e-20', '-keyphrase', 'hey my craft',
+             '-infile', filename], stderr=PIPE)
+        return float(bool(transcription) and not transcription.isspace())
+
+    def run_test(self, test_files, label_name, label):
+        print()
+        print('===', label_name, '===')
+        for test_file in test_files:
             try:
-                with wave.open(filename) as wf:
+                with wave.open(test_file) as wf:
                     frames = wf.readframes(wf.getnframes())
             except (OSError, EOFError):
                 print('?', end='', flush=True)
                 continue
-            out = listener.found_wake_word(frames)
-            {False: negatives, True: positives}[out].append(filename)
+
+            out = int(self.listener.found_wake_word(frames))
+            self.outputs.append(out)
+            self.targets.append(label)
+            self.filenames.append(test_file)
             print('!' if out else '.', end='', flush=True)
         print()
-        return negatives, positives
-
-    false_neg, true_pos = run_test(data_files[0], 'Wake Word')
-    true_neg, false_pos = run_test(data_files[1], 'Not Wake Word')
-    return Stats(false_pos, false_neg, true_pos, true_neg)
 
 
-def main():
-    args = TrainData.parse_args(create_parser(usage))
-    data = TrainData.from_both(args.tags_file, args.tags_folder, args.folder)
-    data_files = data.train_files if args.use_train else data.test_files
-    listener = PocketsphinxListener(
-        args.key_phrase, args.dict_file, args.hmm_folder, args.threshold
-    )
-
-    print('Data:', data)
-    stats = test_pocketsphinx(listener, data_files)
-    show_stats(stats, not args.no_filenames)
-
+main = PocketsphinxTestScript.run_main
 
 if __name__ == '__main__':
     main()

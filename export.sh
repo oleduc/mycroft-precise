@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,15 +13,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if ! [[ "$1" =~ .*\.net$ ]] || ! [ -d "$2" ]; then
-	echo "Usage: $0 <model>.net <folder_name>"
+if ! [[ "$1" =~ .*\.net$ ]] || ! [ -f "$1" ] || ! [[ $# =~ [2-3] ]]; then
+	echo "Usage: $0 <model>.net GITHUB_REPO [BRANCH]"
 	exit 1
 fi
 
-[ -d .cache/precise-data ] || git clone https://github.com/mycroftai/precise-data .cache/precise-data
-model_name=$(date +"${1%%net}%y-%m-%d")
-precise/scripts/convert.py $1 -o "$2/$model_name.pb"
-cp "$1" "$2/$model_name.net"
-cp "$1.params" "$2/$model_name.net.params"
-mv "$model_name.pb" "$model_name.pb.params" "$2"
-echo "Converted to $2/$model_name.*"
+model_file=$(readlink -f "$1")
+repo=$2
+branch=${3-master}
+
+cd "$(dirname "$0")"
+set -e
+cache=.cache/precise-data/${repo//\//.}.${branch//\//.}
+[ -d "$cache" ] || git clone "$repo" "$cache" -b "$branch" --single-branch
+
+pushd "$cache"
+git fetch
+git checkout "$branch"
+git reset --hard "origin/$branch"
+popd
+
+source .venv/bin/activate
+model_name=$(basename "${1%%.net}")
+precise-convert "$model_file" -o "$cache/$model_name.pb"
+
+pushd "$cache"
+tar cvf "$model_name.tar.gz" "$model_name.pb" "$model_name.pb.params"
+md5sum "$model_name.tar.gz" > "$model_name.tar.gz.md5"
+rm -f "$model_name.pb" "$model_name.pb.params" "$model_name.pbtxt"
+git reset
+git add "$model_name.tar.gz" "$model_name.tar.gz.md5"
+
+echo
+ls
+git status
+
+read -p "Uploading $model_name model to branch $branch on repo $repo. Confirm? (y/N) " answer
+if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+    echo "Aborted."
+    exit 1
+fi
+
+git commit -m "Update $model_name"
+git push
+popd
+

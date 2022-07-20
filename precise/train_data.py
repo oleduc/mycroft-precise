@@ -1,4 +1,4 @@
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,23 +11,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Handles loading dataset into memory and processing it
+Used for training and generating statistics for a dataset
+"""
 import json
-from argparse import ArgumentParser
-from contextlib import suppress
+import numpy as np
 from glob import glob
 from hashlib import md5
-from os.path import join, isfile, dirname
+from os.path import join, isfile
+from prettyparse import Usage
+from pyache import Pyache
 from typing import *
 
-import numpy as np
-from prettyparse import add_to_parser
-
-from precise.util import find_wavs
-from precise.vectorization import load_vector, vectorize_inhibit, vectorize
+from precise.util import find_wavs, load_audio
+from precise.vectorization import vectorize_delta, vectorize
 
 
 class TrainData:
     """Class to handle loading of wave data from categorized folders and tagged text files"""
+    usage = Usage('''
+        :folder str
+            Folder to load wav files from
+
+        :-tf --tags-folder str {folder}
+            Specify a different folder to load file ids
+            in tags file from
+
+        :-tg --tags-file str -
+            Text file to load tags from where each line is
+            <file_id> TAB (wake-word|not-wake-word) and
+            {folder}/<file_id>.wav exists
+
+    ''', tags_folder=lambda args: args.tags_folder.format(folder=args.folder))
 
     def __init__(self, train_files: Tuple[List[str], List[str]],
                  test_files: Tuple[List[str], List[str]]):
@@ -72,8 +88,11 @@ class TrainData:
         train_groups = {}
         train_group_file = join(tags_file.replace('.txt', '') + '.groups.json')
         if isfile(train_group_file):
-            with open(train_group_file) as f:
-                train_groups = json.load(f)
+            try:
+                with open(train_group_file) as f:
+                    train_groups = json.load(f)
+            except ValueError:
+                pass
 
         tags_files = {
             'wake-word': [],
@@ -112,14 +131,14 @@ class TrainData:
         """Load data from both a database and a structured folder"""
         return cls.from_tags(tags_file, tags_folder) + cls.from_folder(folder)
 
-    def load(self, train=True, test=True) -> tuple:
+    def load(self, train=True, test=True, shuffle=True) -> tuple:
         """
         Load the vectorized representations of the stored data files
         Args:
             train: Whether to load train data
             test: Whether to load test data
         """
-        return self.__load(self.__load_files, train, test)
+        return self.__load(self.__load_files, train, test, shuffle=shuffle)
 
     def load_inhibit(self, train=True, test=True) -> tuple:
         """Generate data with inhibitory inputs created from wake word samples"""
@@ -140,29 +159,8 @@ class TrainData:
 
     @staticmethod
     def merge(data_a: tuple, data_b: tuple) -> tuple:
+        """Combine two TrainData objects"""
         return np.concatenate((data_a[0], data_b[0])), np.concatenate((data_a[1], data_b[1]))
-
-    @staticmethod
-    def parse_args(parser: ArgumentParser) -> Any:
-        """Return parsed args from parser, adding options for train data inputs"""
-        extra_usage = '''
-            :folder str
-                Folder to wav files from
-            
-            :-tf --tags-folder str {folder}
-                Specify a different folder to load file ids
-                in tags file from
-            
-            :-tg --tags-file str -
-                Text file to load tags from where each line is
-                <file_id> TAB (wake-word|not-wake-word) and
-                {folder}/<file_id>.wav exists
-            
-        '''
-        add_to_parser(parser, extra_usage)
-        args = parser.parse_args()
-        args.tags_folder = args.tags_folder.format(folder=args.folder)
-        return args
 
     def __repr__(self) -> str:
         string = '<TrainData wake_words={kws} not_wake_words={nkws}' \
@@ -180,25 +178,39 @@ class TrainData:
                          (self.test_files[0] + other.test_files[0],
                           self.test_files[1] + other.test_files[1]))
 
-    def __load(self, loader: Callable, train: bool, test: bool) -> tuple:
+    def __load(self, loader: Callable, train: bool, test: bool, **kwargs) -> tuple:
         return tuple([
-            loader(*files) if files else None
+            loader(*files, **kwargs) if files else None
             for files in (train and self.train_files,
                           test and self.test_files)
         ])
 
     @staticmethod
-    def __load_files(kw_files: list, nkw_files: list, vectorizer: Callable = vectorize) -> tuple:
-        inputs = []
-        outputs = []
+    def __load_files(kw_files: list, nkw_files: list, vectorizer: Callable = None, shuffle=True) -> tuple:
+        from precise.params import pr
+
+        input_parts = []
+        output_parts = []
+
+        vectorizer = vectorizer or (vectorize_delta if pr.use_delta else vectorize)
+        cache = Pyache('.cache', lambda x: vectorizer(load_audio(x)), pr.vectorization_md5_hash())
 
         def add(filenames, output):
-            for f in filenames:
-                try:
-                    inputs.append(load_vector(f, vectorizer))
-                    outputs.append(np.array([output]))
-                except ValueError:
-                    print('Skipping invalid file:', f)
+            def on_loop():
+                on_loop.i += 1
+                print('\r{0:.2%}  '.format(on_loop.i / len(filenames)), end='', flush=True)
+
+            on_loop.i = 0
+
+            new_inputs = cache.load(filenames, on_loop=on_loop)
+            new_outputs = np.array([[output] for _ in range(len(new_inputs))])
+            if new_inputs.size == 0:
+                new_inputs = np.empty((0, pr.n_features, pr.feature_size))
+            if new_outputs.size == 0:
+                new_outputs = np.empty((0, 1))
+            input_parts.append(new_inputs)
+            output_parts.append(new_outputs)
+            print('\r       \r', end='', flush=True)
 
         print('Loading wake-word...')
         add(kw_files, 1.0)
@@ -207,7 +219,10 @@ class TrainData:
         add(nkw_files, 0.0)
 
         from precise.params import pr
-        return (
-            np.array(inputs) if inputs else np.empty((0, pr.n_features, pr.feature_size)),
-            np.array(outputs) if outputs else np.empty((0, 1))
-        )
+        inputs = np.concatenate(input_parts) if input_parts else np.empty((0, pr.n_features, pr.feature_size))
+        outputs = np.concatenate(output_parts) if output_parts else np.empty((0, 1))
+
+        shuffle_ids = np.arange(len(inputs))
+        if shuffle:
+            np.random.shuffle(shuffle_ids)
+        return inputs[shuffle_ids], outputs[shuffle_ids]

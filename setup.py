@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,29 @@ from precise import __version__
 setup(
     name='mycroft-precise',
     version=__version__,
+    license='Apache-2.0',
+    author='Matthew Scholefield',
+    author_email='matthew.scholefield@mycroft.ai',
+    description='Mycroft Precise Wake Word Listener',
+    long_description='View more info at `the GitHub page '
+                     '<https://github.com/mycroftai/mycroft-precise#mycroft-precise>`_',
+    url='http://github.com/MycroftAI/mycroft-precise',
+    keywords='wakeword keyword wake word listener sound',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Text Processing :: Linguistic',
+        'License :: OSI Approved :: Apache Software License',
+
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.0',
+        'Programming Language :: Python :: 3.1',
+        'Programming Language :: Python :: 3.2',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+    ],
     packages=[
         'precise',
         'precise.scripts',
@@ -27,24 +50,32 @@ setup(
     ],
     entry_points={
         'console_scripts': [
+            'precise-add-noise=precise.scripts.add_noise:main',
             'precise-collect=precise.scripts.collect:main',
             'precise-convert=precise.scripts.convert:main',
             'precise-eval=precise.scripts.eval:main',
             'precise-listen=precise.scripts.listen:main',
             'precise-listen-pocketsphinx=precise.pocketsphinx.scripts.listen:main',
             'precise-engine=precise.scripts.engine:main',
+            'precise-simulate=precise.scripts.simulate:main',
             'precise-test=precise.scripts.test:main',
+            'precise-graph=precise.scripts.graph:main',
             'precise-test-pocketsphinx=precise.pocketsphinx.scripts.test:main',
             'precise-train=precise.scripts.train:main',
+            'precise-train-optimize=precise.scripts.train_optimize:main',
+            'precise-train-sampled=precise.scripts.train_sampled:main',
             'precise-train-incremental=precise.scripts.train_incremental:main',
+            'precise-train-generated=precise.scripts.train_generated:main',
+            'precise-calc-threshold=precise.scripts.calc_threshold:main',
         ]
     },
+    include_package_data=True,
     install_requires=[
-        'numpy',
-        'tensorflow==1.8.0',  # Must be on piwheels + match URL in setup.sh
-        'speechpy-fast>=2.4',
+        'numpy==1.16',
+        'tensorflow>=1.13,<2.8',  # Must be on piwheels
+        'sonopy',
         'pyaudio',
-        'keras',
+        'keras<=2.1.5',
         'h5py',
         'wavio',
         'typing',

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Attribution: This script was adapted from https://github.com/amir-abdi/keras_to_tensorflow
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,76 +13,79 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Convert wake word model from Keras to TensorFlow
+
+:model str
+    Input Keras model (.net)
+
+:-o --out str {model}.pb
+    Custom output TensorFlow protobuf filename
+"""
 import os
 from os.path import split, isfile
+from prettyparse import Usage
 from shutil import copyfile
 
-from prettyparse import create_parser
-
-usage = '''
-    Convert wake word model from Keras to TensorFlow
-    
-    :model str
-        Input Keras model (.net)
-    
-    :-o --out str {model}.pb
-        Custom output TensorFlow protobuf filename
-'''
+from precise.scripts.base_script import BaseScript
 
 
-def convert(model_path: str, out_file: str):
-    """
-    Converts an HD5F file from Keras to a .pb for use with TensorFlow
+class ConvertScript(BaseScript):
+    usage = Usage(__doc__)
 
-    Args:
-        model_path: location of Keras model
-        out_file: location to write protobuf
-    """
-    print('Converting', model_path, 'to', out_file, '...')
+    def run(self):
+        args = self.args
+        model_name = args.model.replace('.net', '')
+        self.convert(args.model, args.out.format(model=model_name))
 
-    import tensorflow as tf
-    from precise.model import load_precise_model
-    from keras import backend as K
+    def convert(self, model_path: str, out_file: str):
+        """
+        Converts an HD5F file from Keras to a .pb for use with TensorFlow
 
-    out_dir, filename = split(out_file)
-    out_dir = out_dir or '.'
-    os.makedirs(out_dir, exist_ok=True)
+        Args:
+            model_path: location of Keras model
+            out_file: location to write protobuf
+        """
+        print('Converting', model_path, 'to', out_file, '...')
 
-    K.set_learning_phase(0)
-    model = load_precise_model(model_path)
+        import tensorflow as tf
+        from precise.model import load_precise_model
+        from keras import backend as K
 
-    out_name = 'net_output'
-    tf.identity(model.output, name=out_name)
-    print('Output node name:', out_name)
-    print('Output folder:', out_dir)
+        out_dir, filename = split(out_file)
+        out_dir = out_dir or '.'
+        os.makedirs(out_dir, exist_ok=True)
 
-    sess = K.get_session()
+        K.set_learning_phase(0)
+        model = load_precise_model(model_path)
 
-    # Write the graph in human readable
-    tf.train.write_graph(sess.graph.as_graph_def(), out_dir, filename + 'txt', as_text=True)
-    print('Saved readable graph to:', filename + 'txt')
+        out_name = 'net_output'
+        tf.identity(model.output, name=out_name)
+        print('Output node name:', out_name)
+        print('Output folder:', out_dir)
 
-    # Write the graph in binary .pb file
-    from tensorflow.python.framework import graph_util
-    from tensorflow.python.framework import graph_io
+        sess = K.get_session()
 
-    cgraph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), [out_name])
-    graph_io.write_graph(cgraph, out_dir, filename, as_text=False)
+        # Write the graph in human readable
+        tf.train.write_graph(sess.graph.as_graph_def(), out_dir, filename + 'txt', as_text=True)
+        print('Saved readable graph to:', filename + 'txt')
 
-    if isfile(model_path + '.params'):
-        copyfile(model_path + '.params', out_file + '.params')
+        # Write the graph in binary .pb file
+        from tensorflow.python.framework import graph_util
+        from tensorflow.python.framework import graph_io
 
-    print('Saved graph to:', filename)
+        cgraph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), [out_name])
+        graph_io.write_graph(cgraph, out_dir, filename, as_text=False)
 
-    del sess
+        if isfile(model_path + '.params'):
+            copyfile(model_path + '.params', out_file + '.params')
+
+        print('Saved graph to:', filename)
+
+        del sess
 
 
-def main():
-    args = create_parser(usage).parse_args()
-
-    model_name = args.model.replace('.net', '')
-    convert(args.model, args.out.format(model=model_name))
-
+main = ConvertScript.run_main
 
 if __name__ == '__main__':
     main()

@@ -1,5 +1,5 @@
 # Python 2 + 3
-# Copyright 2018 Mycroft AI Inc.
+# Copyright 2019 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import atexit
+
+import time
 from subprocess import PIPE, Popen
 from threading import Thread, Event
 
@@ -72,17 +74,31 @@ class ListenerEngine(Engine):
 
 
 class ReadWriteStream(object):
-    """Class used to support writing binary audio data at any pace"""
-    def __init__(self, s=b''):
+    """
+    Class used to support writing binary audio data at any pace,
+    optionally chopping when the buffer gets too large
+    """
+    def __init__(self, s=b'', chop_samples=-1):
         self.buffer = s
         self.write_event = Event()
+        self.chop_samples = chop_samples
+
+    def __len__(self):
+        return len(self.buffer)
 
     def read(self, n=-1, timeout=None):
         if n == -1:
             n = len(self.buffer)
+        if 0 < self.chop_samples < len(self.buffer):
+            samples_left = len(self.buffer) % self.chop_samples
+            self.buffer = self.buffer[-samples_left:]
+        return_time = 1e10 if timeout is None else (
+                timeout + time.time()
+        )
         while len(self.buffer) < n:
             self.write_event.clear()
-            self.write_event.wait(timeout)
+            if not self.write_event.wait(return_time - time.time()):
+                return b''
         chunk = self.buffer[:n]
         self.buffer = self.buffer[n:]
         return chunk
@@ -90,6 +106,40 @@ class ReadWriteStream(object):
     def write(self, s):
         self.buffer += s
         self.write_event.set()
+
+    def flush(self):
+        """Makes compatible with sys.stdout"""
+        pass
+
+
+class TriggerDetector:
+    """
+    Reads predictions and detects activations
+    This prevents multiple close activations from occurring when
+    the predictions look like ...!!!..!!...
+    """
+    def __init__(self, chunk_size, sensitivity=0.5, trigger_level=3):
+        self.chunk_size = chunk_size
+        self.sensitivity = sensitivity
+        self.trigger_level = trigger_level
+        self.activation = 0
+
+    def update(self, prob):
+        # type: (float) -> bool
+        """Returns whether the new prediction caused an activation"""
+        chunk_activated = prob > 1.0 - self.sensitivity
+
+        if chunk_activated or self.activation < 0:
+            self.activation += 1
+            has_activated = self.activation > self.trigger_level
+            if has_activated or chunk_activated and self.activation < 0:
+                self.activation = -(8 * 2048) // self.chunk_size
+
+            if has_activated:
+                return True
+        elif self.activation > 0:
+            self.activation -= 1
+        return False
 
 
 class PreciseRunner(object):
@@ -107,8 +157,7 @@ class PreciseRunner(object):
         engine (Engine): Object containing info on the binary engine
         trigger_level (int): Number of chunk activations needed to trigger on_activation
                        Higher values add latency but reduce false positives
-        sensitivity (float): From 0.0 to 1.0, relates to the network output level required
-                             to consider a chunk "active"
+        sensitivity (float): From 0.0 to 1.0, how sensitive the network should be
         stream (BinaryIO): Binary audio stream to read 16000 Hz 1 channel int16
                            audio from. If not given, the microphone is used
         on_prediction (Callable): callback for every new prediction
@@ -119,31 +168,26 @@ class PreciseRunner(object):
                  on_prediction=lambda x: None, on_activation=lambda: None):
         self.engine = engine
         self.trigger_level = trigger_level
-        self.sensitivity = sensitivity
         self.stream = stream
         self.on_prediction = on_prediction
         self.on_activation = on_activation
         self.chunk_size = engine.chunk_size
-        self.read_divisor = 1
 
         self.pa = None
         self.thread = None
         self.running = False
         self.is_paused = False
+        self.detector = TriggerDetector(self.chunk_size, sensitivity, trigger_level)
         atexit.register(self.stop)
 
-    def _calc_read_divisor(self):
+    def _wrap_stream_read(self, stream):
         """
         pyaudio.Stream.read takes samples as n, not bytes
-        so read(n) should be read(n // sample_depth
+        so read(n) should be read(n // sample_depth)
         """
-        try:
-            import pyaudio
-            if isinstance(self.stream, pyaudio.Stream):
-                return 2
-        except ImportError:
-            pass
-        return 1
+        import pyaudio
+        if getattr(stream.read, '__func__', None) is pyaudio.Stream.read:
+            stream.read = lambda x: pyaudio.Stream.read(stream, x // 2, False)
 
     def start(self):
         """Start listening from stream"""
@@ -154,12 +198,12 @@ class PreciseRunner(object):
                 16000, 1, paInt16, True, frames_per_buffer=self.chunk_size
             )
 
-        self.read_divisor = self._calc_read_divisor()
+        self._wrap_stream_read(self.stream)
 
         self.engine.start()
         self.running = True
         self.is_paused = False
-        self.thread = Thread(target=self._handle_predictions)
+        self.thread = Thread(target=self._handle_predictions, daemon=True)
         self.thread.daemon = True
         self.thread.start()
 
@@ -187,24 +231,13 @@ class PreciseRunner(object):
 
     def _handle_predictions(self):
         """Continuously check Precise process output"""
-        activation = 0
         while self.running:
-            chunk = self.stream.read(self.chunk_size // self.read_divisor)
+            chunk = self.stream.read(self.chunk_size)
 
             if self.is_paused:
                 continue
 
             prob = self.engine.get_prediction(chunk)
             self.on_prediction(prob)
-            chunk_activated = prob > 1 - self.sensitivity
-
-            if chunk_activated or activation < 0:
-                activation += 1
-                has_activated = activation > self.trigger_level
-                if has_activated:
-                    self.on_activation()
-
-                if has_activated or chunk_activated and activation < 0:
-                    activation = -(8 * 2048) // self.chunk_size
-            elif activation > 0:
-                activation -= 1
+            if self.detector.update(prob):
+                self.on_activation()
