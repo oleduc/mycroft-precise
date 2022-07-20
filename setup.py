@@ -29,7 +29,17 @@ if liant_context != '' and liant_context != None:
     release_version = __liant_version__
 
 local_label = environ.get('PYPI_LOCAL_LABEL')
-if local_label != '' and local_label != None and local_label != 'main':
+if tag != '' and tag != None:
+    from packaging import version
+    release_version = version.parse(tag)
+    if not isinstance(release_version, version.Version):
+        print(f"""
+### ERROR: could not parse tag {tag} as a PEP440 version.
+
+Failing now.
+""")
+        exit(1)
+elif local_label != '' and local_label != None and local_label != 'main':
     print(f"Try to build with local_label: {local_label}")
     try:
         from precise import __local_version__
@@ -40,16 +50,6 @@ if local_label != '' and local_label != None and local_label != 'main':
 
 If you want to deploy your branch package with your local label: {local_label}, please create a __local_version__ in precise/__init__.py
 and maintain it.
-
-Failing now.
-""")
-        exit(1)
-if tag != '' and tag != None:
-    from packaging import version
-    release_version = version.parse(tag)
-    if not isinstance(release_version, version.Version):
-        print(f"""
-### ERROR: could not parse tag {tag} as a PEP440 version.
 
 Failing now.
 """)
