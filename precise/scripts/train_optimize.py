@@ -39,7 +39,7 @@ import json
 from math import exp
 from uuid import uuid4
 
-from keras.models import save_model
+from tensorflow.keras.models import save_model
 from prettyparse import Usage
 
 from precise.annoyance_estimator import AnnoyanceEstimator

@@ -53,7 +53,7 @@ class CalcThresholdScript(BaseScript):
         import numpy as np
 
         model_data = {
-            name: Stats.from_np_dict(data) for name, data in np.load(args.input_file)['data'].item().items()
+            name: Stats.from_np_dict(data) for name, data in np.load(args.input_file, allow_pickle=True)['data'].item().items()
         }
         model_name = args.model_key or basename(splitext(args.model)[0])
 

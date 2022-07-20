@@ -14,11 +14,39 @@
 # limitations under the License.
 from setuptools import setup
 
-from precise import __version__
+from precise import __version__, __liant_version__
+
+from os import environ
+
+package_name = 'mycroft-precise'
+version = __version__,
+
+liant_context = environ.get('PYPI_LIANT')
+if liant_context != '' and liant_context != None:
+    print('Building Liant SASU version...')
+    package_name = 'liant-precise'
+    version = __liant_version__
+
+local_label = environ.get('PYPI_LOCAL_LABEL')
+if local_label != '' and local_label != None:
+    print(f"Try to build with local_label: {local_label}")
+    try:
+        from precise import __local_version__
+        version = version + '+' + local_label + '.' + __local_version__
+    except ImportError:
+        print(f"""
+### ERROR: could not find local version.
+
+If you want to deploy your branch package with your local label: {local_label}, please create a __local_version__ in precise/__init__.py
+and maintain it.
+
+Failing now.
+""")
+        exit(1)
 
 setup(
-    name='mycroft-precise',
-    version=__version__,
+    name=package_name,
+    version=version,
     license='Apache-2.0',
     author='Matthew Scholefield',
     author_email='matthew.scholefield@mycroft.ai',
@@ -71,40 +99,14 @@ setup(
     },
     include_package_data=True,
     install_requires=[
-        'numpy==1.16',
-        'tensorflow>=1.13,<2.8',  # Must be on piwheels
+        'numpy',
+        'tensorflow==2.3.1',  # Must be on piwheels
         'sonopy',
         'pyaudio',
-        'keras<=2.1.5',
         'h5py',
         'wavio',
         'typing',
         'prettyparse<1.0',
         'precise-runner'
-    ],
-
-    author='Matthew Scholefield',
-    author_email='matthew.scholefield@mycroft.ai',
-    description='Mycroft Precise Wake Word Listener',
-    long_description='View more info at `the GitHub page '
-                     '<https://github.com/mycroftai/mycroft-precise#mycroft-precise>`_',
-    keywords='wakeword keyword wake word listener sound',
-    url='http://github.com/MycroftAI/mycroft-precise',
-
-    zip_safe=True,
-    classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'Topic :: Text Processing :: Linguistic',
-        'License :: OSI Approved :: Apache Software License',
-
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.0',
-        'Programming Language :: Python :: 3.1',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-    ],
+    ]
 )
