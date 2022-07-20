@@ -79,11 +79,32 @@ setup(
         'h5py',
         'wavio',
         'typing',
-        'prettyparse>=1.1.0',
-        'precise-runner',
-        'attrs',
-        'fitipy<1.0',
-        'speechpy-fast',
-        'pyache'
-    ]
+        'prettyparse<1.0',
+        'precise-runner'
+    ],
+
+    author='Matthew Scholefield',
+    author_email='matthew.scholefield@mycroft.ai',
+    description='Mycroft Precise Wake Word Listener',
+    long_description='View more info at `the GitHub page '
+                     '<https://github.com/mycroftai/mycroft-precise#mycroft-precise>`_',
+    keywords='wakeword keyword wake word listener sound',
+    url='http://github.com/MycroftAI/mycroft-precise',
+
+    zip_safe=True,
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Text Processing :: Linguistic',
+        'License :: OSI Approved :: Apache Software License',
+
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.0',
+        'Programming Language :: Python :: 3.1',
+        'Programming Language :: Python :: 3.2',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+    ],
 )
