@@ -19,20 +19,21 @@ from precise import __version__, __liant_version__
 from os import environ
 
 package_name = 'mycroft-precise'
-version = __version__,
+release_version = __version__,
 
 liant_context = environ.get('PYPI_LIANT')
+tag = environ.get('PYPI_TAG')
 if liant_context != '' and liant_context != None:
     print('Building Liant SASU version...')
     package_name = 'liant-precise'
-    version = __liant_version__
+    release_version = __liant_version__
 
 local_label = environ.get('PYPI_LOCAL_LABEL')
 if local_label != '' and local_label != None and local_label != 'main':
     print(f"Try to build with local_label: {local_label}")
     try:
         from precise import __local_version__
-        version = version + '+' + local_label + '.' + __local_version__
+        release_version = release_version + '+' + local_label + '.' + __local_version__
     except ImportError:
         print(f"""
 ### ERROR: could not find local version.
@@ -43,10 +44,20 @@ and maintain it.
 Failing now.
 """)
         exit(1)
+if tag != '' and tag != None:
+    from packaging import version
+    release_version = version.parse(tag)
+    if not isinstance(release_version, version.Version):
+        print(f"""
+### ERROR: could not parse tag {tag} as a PEP440 version.
+
+Failing now.
+""")
+        exit(1)
 
 setup(
     name=package_name,
-    version=version,
+    version=str(release_version),
     license='Apache-2.0',
     author='Matthew Scholefield',
     author_email='matthew.scholefield@mycroft.ai',

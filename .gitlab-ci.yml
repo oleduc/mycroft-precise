@@ -36,6 +36,7 @@ build-wheel:
   stage: build
   variables:
     PYPI_LOCAL_LABEL: $CI_COMMIT_REF_SLUG
+    PYPI_TAG: $CI_COMMIT_TAG
   script:
     - pip install build
     - python -m build
@@ -47,7 +48,7 @@ build-wheel:
     - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       allow_failure: true
       when: on_success
-    - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_TAG
       allow_failure: false
       when: on_success
 
@@ -118,7 +119,7 @@ deploy:
     - build-wheel
     - test
   rules:
-    - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+    - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_TAG
       when: manual
 # pages:
 #   script:
