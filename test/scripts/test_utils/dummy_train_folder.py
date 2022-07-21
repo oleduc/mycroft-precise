@@ -24,7 +24,7 @@ from test.scripts.test_utils.temp_folder import TempFolder
 class DummyTrainFolder(TempFolder):
     def __init__(self, root=None):
         super().__init__(root)
-        self.model = self.path('model.net')
+        self.model = self.path('model.h5')
 
     def generate_samples(self, count, subfolder, name, generator):
         """
@@ -63,4 +63,4 @@ class DummyTrainFolder(TempFolder):
             count, ('test', 'not-wake-word'), 'nww-{}.wav',
             lambda: np.random.random(self.get_duration()) * 2 - 1
         )
-        self.model = self.path('model.net')
+        self.model = self.path('model.h5')

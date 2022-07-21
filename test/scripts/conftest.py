@@ -55,7 +55,7 @@ def _trained_model():
 @pytest.fixture()
 def trained_model(_trained_model, temp_folder):
     """Copy of session wide model"""
-    model = temp_folder.path('trained_model.net')
+    model = temp_folder.path('trained_model.h5')
     shutil.copy(_trained_model, model)
     shutil.copy(_trained_model + '.params', model + '.params')
     return model
