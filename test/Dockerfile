@@ -11,6 +11,9 @@ COPY requirements/test.txt mycroft-precise/requirements/
 RUN pip install -r mycroft-precise/requirements/test.txt
 COPY requirements/prod.txt mycroft-precise/requirements/
 RUN pip install -r mycroft-precise/requirements/prod.txt
+RUN ls
+RUN pwd
+RUN pip install runner
 COPY . mycroft-precise
 # Run the tests defined in the precise repository
 FROM precise-build as test-runner
