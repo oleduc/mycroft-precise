@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from os.path import join, dirname, abspath
 from setuptools import setup
 
 from precise import __version__, __liant_version__
@@ -19,7 +20,12 @@ from precise import __version__, __liant_version__
 from os import environ
 
 package_name = 'mycroft-precise'
-release_version = __version__,
+release_version = __version__
+
+with open(join(dirname(abspath(__file__)), 'requirements/prod.txt')) as f:
+     requirements = []
+     for line in f.readlines():
+         requirements.append(line.split('#')[0].strip())
 
 liant_context = environ.get('PYPI_LIANT')
 tag = environ.get('PYPI_TAG')
@@ -109,15 +115,5 @@ setup(
         ]
     },
     include_package_data=True,
-    install_requires=[
-        'numpy',
-        'tensorflow==2.3.1',  # Must be on piwheels
-        'sonopy',
-        'pyaudio',
-        'h5py',
-        'wavio',
-        'typing',
-        'prettyparse<1.0',
-        'precise-runner'
-    ]
+    install_requires=requirements
 )
