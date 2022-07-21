@@ -4,7 +4,11 @@
 FROM python:3.7-slim as precise-build
 ENV TERM linux
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update && apt-get -y install git python3-scipy cython3 libhdf5-dev python3-h5py portaudio19-dev swig libpulse-dev libatlas-base-dev
+RUN apt-get update \
+    && apt-get -y install \
+    git python3-scipy cython3 libhdf5-dev python3-h5py \
+    portaudio19-dev swig libpulse-dev libatlas-base-dev \
+    alsa-utils
 RUN mkdir -p /root/allure /opt/mycroft/mycroft-precise /root/code-quality
 WORKDIR /opt/mycroft
 COPY requirements/test.txt mycroft-precise/requirements/
@@ -15,7 +19,7 @@ COPY . mycroft-precise
 # Run the tests defined in the precise repository
 FROM precise-build as test-runner
 WORKDIR /opt/mycroft/mycroft-precise
-RUN python3 -m pip install -e ./runner
+RUN python3 -m pip install ./runner
 ENTRYPOINT ["pytest"]
 
 FROM precise-build as precise-codequality
