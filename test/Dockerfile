@@ -11,13 +11,11 @@ COPY requirements/test.txt mycroft-precise/requirements/
 RUN python3 -m pip install -r mycroft-precise/requirements/test.txt
 COPY requirements/prod.txt mycroft-precise/requirements/
 RUN python3 -m pip install -r mycroft-precise/requirements/prod.txt
-RUN ls
-RUN pwd
-RUN python3 -m pip install -e ./runner
 COPY . mycroft-precise
 # Run the tests defined in the precise repository
 FROM precise-build as test-runner
 WORKDIR /opt/mycroft/mycroft-precise
+RUN python3 -m pip install -e ./runner
 ENTRYPOINT ["pytest"]
 
 FROM precise-build as precise-codequality
