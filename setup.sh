@@ -45,6 +45,8 @@ if [ "$os" = "Linux" ]; then
 elif [ "$os" = "Darwin" ]; then
     if is_command brew; then
         brew install portaudio
+        export CFLAGS="$CFLAGS -I$(brew --prefix)/include"
+        export LDFLAGS="$LDFLAGS -L$(brew --prefix)/lib"
     fi
 fi
 
