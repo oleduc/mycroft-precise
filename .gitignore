@@ -27,8 +27,6 @@ __pycache__/
 /*/not-wake-word/
 /*/test/
 
-!requirements.txt
-
 # jenkins branch
 /wake-words.txt
 /all/

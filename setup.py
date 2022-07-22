@@ -22,11 +22,6 @@ from os import environ
 package_name = 'mycroft-precise'
 release_version = __version__
 
-with open(join(dirname(abspath(__file__)), 'requirements/prod.txt')) as f:
-     requirements = []
-     for line in f.readlines():
-         requirements.append(line.split('#')[0].strip())
-
 liant_context = environ.get('PYPI_LIANT')
 tag = environ.get('PYPI_TAG')
 if liant_context != '' and liant_context != None:
@@ -115,5 +110,19 @@ setup(
         ]
     },
     include_package_data=True,
-    install_requires=requirements
+    install_requires=[
+        'tensorflow==2.3.1',  # Must be on piwheels
+        'numpy',
+        'sonopy',
+        'pyaudio',
+        'h5py',
+        'wavio',
+        'typing',
+        'prettyparse>=1.1.0',
+        'precise-runner',
+        'attrs',
+        'fitipy<1.0',
+        'speechpy-fast',
+        'pyache'
+    ]
 )
