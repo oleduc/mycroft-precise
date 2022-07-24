@@ -11,11 +11,10 @@ RUN apt-get update \
     alsa-utils
 RUN mkdir -p /root/allure /opt/mycroft/mycroft-precise /root/code-quality
 WORKDIR /opt/mycroft
-COPY requirements/test.txt mycroft-precise/requirements/
-RUN python3 -m pip install -r mycroft-precise/requirements/test.txt
-COPY requirements/prod.txt mycroft-precise/requirements/
-RUN python3 -m pip install -r mycroft-precise/requirements/prod.txt
+COPY test/requirements.txt mycroft-precise/test/
+RUN python3 -m pip install -r mycroft-precise/test/requirements.txt
 COPY . mycroft-precise
+RUN python3 -m pip install -e ./mycroft-precise/
 # Run the tests defined in the precise repository
 FROM precise-build as test-runner
 WORKDIR /opt/mycroft/mycroft-precise
