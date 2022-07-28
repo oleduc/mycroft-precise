@@ -6,7 +6,7 @@
 
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-image: python:3.7
+image: python:3.9
 
 # Include templates from https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates
 # We could add more later, see here: https://gitlab.com/gitlab-org/gitlab/-/blob/master/doc/development/cicd/templates.md
@@ -83,6 +83,32 @@ test:
   script:
     - pytest
 
+.local-test:
+  stage: test
+  needs: []
+  before_script:
+    - ./setup.sh
+    - export VENV=${VENV-$(pwd)/.venv}
+    - source "$VENV/bin/activate"
+    - python3 -m pip install --no-cache-dir -r test/requirements.txt
+  script:
+    - python3 -m pytest
+  rules:
+    - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG)
+      when: on_success
+    - when: never
+
+test-darwin:
+  extends: .local-test
+  tags:
+    - darwin
+
+test-arm64-linux:
+  extends: .local-test
+  tags:
+    - arm64
+    - linux
+
 deploy-merge-request:
   stage: deploy
   variables:
@@ -103,6 +129,8 @@ deploy-merge-request:
   needs:
     - build-wheel
     - test
+    - test-darwin
+    - test-arm64-linux
   rules:
     - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH
       allow_failure: true
@@ -119,6 +147,8 @@ deploy:
   needs:
     - build-wheel
     - test
+    - test-darwin
+    - test-arm64-linux
   rules:
     - if: ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG) && $CI_COMMIT_TAG
       when: manual

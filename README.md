@@ -1,4 +1,4 @@
-# Mycroft Precise
+# Liant Precise, a Mycroft Precise's fork
 
 *A lightweight, simple-to-use, RNN wake word listener.*
 
@@ -38,9 +38,23 @@ running through the [**source install instructions**][source-install] first.
 ## Installation
 
 If you just want to use Mycroft Precise for running models in your own application,
-you can use the binary install option. Note: This is only updated to the latest release,
+you can use the pypi install option. Note: This is only updated to the latest release,
 indicated by the latest commit on the master branch. If you want to train your own models
 or mess with the source code, you'll need to follow the **Source Install** instructions below.
+
+### Pypi Install
+
+The pypi package is compatible with:
+- python ≥3.7 on linux/amd64, darwin/amd64 and darwin/aarch64
+- python ≥3.9 on linux/aarch64 (like raspberry pi last pi OS 64 bit)
+
+You need to install brew or some build equivalent system, and then install portaudio on macosx:
+    brew install portaudio
+
+On Debian/Ubuntu system you will have to install install with the following command:
+    apt install -yq --no-install-recommends build-essential git python3-scipy cython3 libhdf5-dev python3-h5py portaudio19-dev swig libpulse-dev libatlas-base-dev alsa-utils
+
+At this moment, tests are passing with tensorflow 2.7.0.
 
 ### Binary Install
 
