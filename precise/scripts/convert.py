@@ -64,7 +64,7 @@ class ConvertScript(BaseScript):
         # Converting instead to TFLite model
         print('Starting TFLite conversion.')
         converter = tf.lite.TFLiteConverter.from_keras_model(model)
-        converter.target_ops = [tf.lite.OpsSet.TFLITE_BUILTINS,tf.lite.OpsSet.SELECT_TF_OPS]
+        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS,tf.lite.OpsSet.SELECT_TF_OPS]
         tflite_model = converter.convert()
         open(out_file, "wb").write(tflite_model)
         print('Wrote to ' + out_file)
