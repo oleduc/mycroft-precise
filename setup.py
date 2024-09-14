@@ -115,7 +115,7 @@ setup(
         'h5py~=3.7.0',
         'wavio~=0.0.4',
         'typing~=3.7.4.3',
-        'prettyparse~=1.1.0',
+        'prettyparse~=1.2.0',
         "precise-runner",
         'attrs~=21.4.0',
         'fitipy~=0.1.2',
