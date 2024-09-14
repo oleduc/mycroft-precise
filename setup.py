@@ -106,8 +106,9 @@ setup(
     },
     include_package_data=True,
     install_requires=[
-        "tensorflow==2.7.0;platform_system=='Linux'",  # Must be on piwheels
-        "tensorflow-macos==2.7.0;platform_system=='Darwin'",
+        "protobuf==3.20.*",
+        "tensorflow==2.8.0;platform_system=='Linux'",  # Must be on piwheels
+        "tensorflow-macos==2.8.0;platform_system=='Darwin'",
         'numpy~=1.21.6',
         'sonopy~=0.1.2',
         'pyaudio~=0.2.12',

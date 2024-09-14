@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """
 Pieces that convert audio to predictions
 """
@@ -20,6 +21,8 @@ from importlib import import_module
 from os.path import splitext
 from typing import *
 from typing import BinaryIO
+
+import tensorflow as tf  # Updated import for TensorFlow 2.x
 
 from precise.threshold_decoder import ThresholdDecoder
 from precise.model import load_precise_model
@@ -43,39 +46,45 @@ class Runner(metaclass=ABCMeta):
 
 
 class TensorFlowRunner(Runner):
-    """Executes a frozen Tensorflow model created from precise-convert"""
+    """Executes a frozen TensorFlow model created from precise-convert"""
     def __init__(self, model_name: str):
         if model_name.endswith('.net'):
-            print('Warning: ', model_name, 'looks like a Keras model.')
-        self.tf = import_module('tensorflow')
-        self.graph = self.load_graph(model_name)
-        with self.graph.as_default():
-            self.inp_var = self.graph.get_operation_by_name('import/net_input').outputs[0]
-            self.out_var = self.graph.get_operation_by_name('import/net_output').outputs[0]
+            print('Warning:', model_name, 'looks like a Keras model.')
 
-            self.sess = self.tf.Session(graph=self.graph)
+        self.model_func = self.load_graph(model_name)
 
-    def load_graph(self, model_file: str) -> 'tf.Graph':
-        graph = self.tf.Graph()
-        graph_def = self.tf.compat.v1.GraphDef()
-
-        with open(model_file, "rb") as f:
+    def load_graph(self, model_file: str):
+        with tf.io.gfile.GFile(model_file, "rb") as f:
+            graph_def = tf.compat.v1.GraphDef()
             graph_def.ParseFromString(f.read())
-        with graph.as_default():
-            self.tf.import_graph_def(graph_def)
 
-        return graph
+        def _imports_graph_def():
+            tf.compat.v1.import_graph_def(graph_def, name="")
+
+        wrapped_import = tf.compat.v1.wrap_function(_imports_graph_def, [])
+        import_graph = wrapped_import.graph
+
+        # Get input and output tensors
+        input_tensor = import_graph.get_tensor_by_name('net_input:0')
+        output_tensor = import_graph.get_tensor_by_name('net_output:0')
+
+        # Prune the function to input and output tensors
+        model_func = wrapped_import.prune(
+            feeds=[input_tensor],
+            fetches=[output_tensor]
+        )
+        return model_func
 
     def predict(self, inputs: np.ndarray) -> np.ndarray:
-        """Run on multiple inputs"""
-        return self.sess.run(self.out_var, {self.inp_var: inputs})
+        outputs = self.model_func(tf.constant(inputs, dtype=tf.float32))
+        return outputs[0].numpy()
 
     def run(self, inp: np.ndarray) -> float:
         return self.predict(inp[np.newaxis])[0][0]
 
 
 class KerasRunner(Runner):
-    """ Executes a regular Keras model created from precise-train"""
+    """Executes a regular Keras model created from precise-train"""
     def __init__(self, model_name: str):
         self.model = load_precise_model(model_name)
 
@@ -87,35 +96,33 @@ class KerasRunner(Runner):
 
 
 class TFLiteRunner(Runner):
-     def __init__(self, model_name: str):
-         import tensorflow as tf
-         #  Setup tflite environment
-         self.interpreter = tf.lite.Interpreter(model_path=model_name)
-         self.interpreter.allocate_tensors()
+    def __init__(self, model_name: str):
+        # Setup tflite environment
+        self.interpreter = tf.lite.Interpreter(model_path=model_name)
+        self.interpreter.allocate_tensors()
 
-         self.input_details = self.interpreter.get_input_details()
-         self.output_details = self.interpreter.get_output_details()
+        self.input_details = self.interpreter.get_input_details()
+        self.output_details = self.interpreter.get_output_details()
 
-     def predict(self, inputs: np.ndarray):
-         # Format output to match Keras's model.predict output
-         count = 0
-         output_data = np.ndarray((inputs.shape[0],1), dtype=np.float32)
+    def predict(self, inputs: np.ndarray):
+        # Format output to match Keras's model.predict output
+        output_data = np.ndarray((inputs.shape[0], 1), dtype=np.float32)
 
-         # Support for multiple inputs
-         for input in inputs:
-           # Format as float32. Add a wrapper dimension.
-           current = np.array([input]).astype(np.float32)
+        # Support for multiple inputs
+        for count, input_data in enumerate(inputs):
+            # Format as float32. Add a wrapper dimension.
+            current = np.array([input_data]).astype(np.float32)
 
-           # Load data, run inference and extract output from tensor
-           self.interpreter.set_tensor(self.input_details[0]['index'], current)
-           self.interpreter.invoke()
-           output_data[count] = self.interpreter.get_tensor(self.output_details[0]['index'])
-           count += 1
+            # Load data, run inference and extract output from tensor
+            self.interpreter.set_tensor(self.input_details[0]['index'], current)
+            self.interpreter.invoke()
+            output_data[count] = self.interpreter.get_tensor(self.output_details[0]['index'])
 
-         return output_data
+        return output_data
 
-     def run(self, inp: np.ndarray) -> float:
-         return self.predict(inp[np.newaxis])[0][0]
+    def run(self, inp: np.ndarray) -> float:
+        return self.predict(inp[np.newaxis])[0][0]
+
 
 class Listener:
     """Listener that preprocesses audio into MFCC vectors and executes neural networks"""
